@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-st.title("Simple Randomization App - Parallel Design 1:1 with Withdrawals")
+st.title("Block Randomization App - Parallel Design 1:1 with Withdrawals")
 
 # Initialize session state
 if "randomized" not in st.session_state:
@@ -13,6 +13,8 @@ if "withdrawn" not in st.session_state:
     st.session_state.withdrawn = []
 if "seed" not in st.session_state:
     st.session_state.seed = 42
+if "block_queue" not in st.session_state:
+    st.session_state.block_queue = []
 
 # Input seed for reproducibility
 seed = st.number_input("Enter a seed for reproducibility (optional)", value=st.session_state.seed, step=1)
@@ -28,21 +30,20 @@ remaining_slots = target_enrollment - current_enrolled
 
 st.markdown(f"**Current Enrolled:** {current_enrolled} / {target_enrollment}")
 
+# Create new block if block_queue is empty
+def generate_block():
+    block_size = 4  # Must be even for 1:1 allocation
+    block = ["M+K group", "SOC group"] * (block_size // 2)
+    random.shuffle(block)
+    return block
+
 if remaining_slots > 0:
     if st.button("Randomize Next Participant"):
-        participant_id = f"P{len(st.session_state.randomized) + 1:03d}"
-        group_counts = {
-            "M+K group": sum(1 for p in st.session_state.randomized if p['Group'] == "M+K group" and p['ID'] not in st.session_state.withdrawn),
-            "SOC group": sum(1 for p in st.session_state.randomized if p['Group'] == "SOC group" and p['ID'] not in st.session_state.withdrawn),
-        }
-        # Balance allocation
-        if group_counts["M+K group"] > group_counts["SOC group"]:
-            group = "SOC group"
-        elif group_counts["M+K group"] < group_counts["SOC group"]:
-            group = "M+K group"
-        else:
-            group = random.choice(["M+K group", "SOC group"])
+        if not st.session_state.block_queue:
+            st.session_state.block_queue = generate_block()
 
+        participant_id = f"P{len(st.session_state.randomized) + 1:03d}"
+        group = st.session_state.block_queue.pop(0)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         st.session_state.randomized.append({"ID": participant_id, "Group": group, "Timestamp": timestamp, "Note": ""})
 
