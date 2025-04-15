@@ -11,6 +11,8 @@ if "randomized" not in st.session_state:
     st.session_state.randomized = []
 if "withdrawn" not in st.session_state:
     st.session_state.withdrawn = []
+if "excluded" not in st.session_state:
+    st.session_state.excluded = []
 if "seed" not in st.session_state:
     st.session_state.seed = 42
 if "to_remove" not in st.session_state:
@@ -28,8 +30,8 @@ if assessed:
 
     # Step 2: Inclusion Criteria
     st.subheader("Step 2: Inclusion Criteria")
-    age_criteria = st.radio("Is the patient an adult (18+)?", ["Yes", "No"], index=0)
-    transplant_criteria = st.radio("Is this a deceased donor liver transplant?", ["Yes", "No"], index=0)
+    age_criteria = st.radio("Is the patient an adult (18+)?", ["Yes", "No"], index=0, key="age")
+    transplant_criteria = st.radio("Is this a deceased donor liver transplant?", ["Yes", "No"], index=0, key="transplant")
 
     if age_criteria == "Yes" and transplant_criteria == "Yes":
         # Step 3: Exclusion Criteria
@@ -37,7 +39,7 @@ if assessed:
         exclusions = {
             "Preoperative intubation": st.radio("Preoperative intubation", ["No", "Yes"], index=0),
             "Sedation or high vasopressor use": st.radio("Sedation or high vasopressor use", ["No", "Yes"], index=0),
-            "Severe hepatic encephalopathy": st.radio("Severe hepatic encephalopathy in preoperative setting", ["No", "Yes"], index=0),
+            "Moderate/severe hepatic encephalopathy": st.radio("Moderate/severe hepatic encephalopathy in preoperative setting", ["No", "Yes"], index=0),
             "Acute liver failure": st.radio("Acute liver failure", ["No", "Yes"], index=0),
             "Allergy to medications": st.radio("Known allergy to either medications", ["No", "Yes"], index=0),
             "Psychiatric disorder": st.radio("Psychiatric disorders (e.g., schizophrenia, bipolar disorder)", ["No", "Yes"], index=0),
@@ -46,6 +48,8 @@ if assessed:
 
         if "Yes" in exclusions.values():
             st.error("Patient is excluded based on exclusion criteria.")
+            st.session_state.excluded.append({"Subject Number": subject_number, "Reason": "Failed exclusion criteria", "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+            st.session_state.subject_counter += 1
         else:
             st.success("Patient is eligible for randomization.")
 
@@ -80,6 +84,10 @@ if assessed:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     st.session_state.randomized.append({"ID": participant_id, "Group": group, "Timestamp": timestamp, "Note": ""})
                     st.session_state.subject_counter += 1
+    else:
+        st.warning("Inclusion criteria not met. Subject is excluded.")
+        st.session_state.excluded.append({"Subject Number": subject_number, "Reason": "Failed inclusion criteria", "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        st.session_state.subject_counter += 1
 
 # Handle participant removal
 if st.session_state.to_remove:
@@ -122,5 +130,16 @@ if st.session_state.randomized:
         file_name='enrolled_randomization_results.csv',
         mime='text/csv',
     )
-else:
-    st.info("No participants randomized yet.")
+
+# Display excluded participants
+if st.session_state.excluded:
+    st.subheader("Excluded Participants")
+    excluded_df = pd.DataFrame(st.session_state.excluded)
+    st.dataframe(excluded_df)
+    excluded_csv = excluded_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Excluded Participants as CSV",
+        data=excluded_csv,
+        file_name='excluded_participants.csv',
+        mime='text/csv',
+    )
